@@ -1,0 +1,14 @@
+xxl_job:
+    # 调度中心地址
+    admin:
+      addresses: http://127.0.0.1:8080/xxl-job-admin
+    # 访问token
+    access_token:
+    executor:
+      # 执行器的appname
+      appname: xxl-job-executor-sample
+      address:
+      ip:
+      port: 9998
+      log_path: ./data/applogs/xxl-job/jobhandler
+      log_retention_days: 30
