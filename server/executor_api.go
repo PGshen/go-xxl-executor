@@ -14,7 +14,11 @@ var executorBiz = biz.ExecutorBiz{}
 
 // 启动http服务import cycle not allowed
 
-func StartServer() {
+func Start() {
+	go startServer()
+}
+
+func startServer() {
 	http.HandleFunc("/beat", beat)
 	http.HandleFunc("/idleBeat", idleBeat)
 	http.HandleFunc("/run", run)
@@ -44,7 +48,18 @@ func idleBeat(w http.ResponseWriter, r *http.Request) {
 }
 
 func run(w http.ResponseWriter, r *http.Request) {
+	//r.ParseForm()
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		log.Printf("read body err, %v\n", err)
+		return
+	}
+
 	var param model.TriggerParam
+	if err = json.Unmarshal(body, &param); err != nil {
+		log.Printf("Unmarshal err, %v\n", err)
+		return
+	}
 	_, _ = fmt.Fprintln(w, executorBiz.Run(param))
 }
 
@@ -57,4 +72,3 @@ func loglog(w http.ResponseWriter, r *http.Request) {
 	var param model.LogParam
 	_, _ = fmt.Fprintln(w, executorBiz.Log(param))
 }
-
