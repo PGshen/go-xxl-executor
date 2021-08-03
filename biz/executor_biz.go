@@ -38,6 +38,7 @@ func (e *ExecutorBiz) Run(param model.TriggerParam) ReturnT {
 		// jobId任务已在队列
 		taskQueue.Mutex.Lock()
 		var todoTasks = taskQueue.TodoTasks
+		// todo 增加logId判断，避免重复触发
 		todoTasks = append(todoTasks, param)
 		taskQueue.TodoTasks = todoTasks
 		taskQueue.Mutex.Unlock()
@@ -52,10 +53,19 @@ func (e *ExecutorBiz) Run(param model.TriggerParam) ReturnT {
 	return NewReturnT(common.SuccessCode, "run success")
 }
 
-// Kill 终止
+// Kill 终止 这里传入的是jobId,目前只终止了当前正在运行的；需要终止所有正在队列里排队的任务吗？或者说传入logId是否更合适？？
 func (e *ExecutorBiz) Kill(param model.KillParam) ReturnT {
-	// todo
-	return NewReturnT(common.SuccessCode, "kill success")
+	jobId := param.JobId
+	if runningCtx, ok := RunningList.RunningContextMap[jobId]; ok {
+		runningCtx.Cancel()
+		log.Println("kill job manually! jobId = " + strconv.Itoa(jobId))
+		RunningList.Mutex.Lock()
+		delete(RunningList.RunningContextMap, jobId)	// 从运行中队列里移除
+		RunningList.Mutex.Unlock()
+		return NewReturnT(common.SuccessCode, "kill success")
+	} else {
+		return NewFailReturnT("current Job[jobId = " + strconv.Itoa(jobId) + "] does not running...")
+	}
 }
 
 // Log 查看日志

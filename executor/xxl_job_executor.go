@@ -70,7 +70,7 @@ func doTask(jobId int, taskQueue *biz.TaskQueue) {
 	// 串行，暂未实现阻塞处理策略
 	for {
 		if len(taskQueue.TodoTasks) == 0 {
-			break
+			break	// 所有任务跑完，退出任务循环
 		}
 		taskQueue.Mutex.Lock()
 		task := taskQueue.TodoTasks[0]
@@ -102,10 +102,13 @@ func trigger(task model.TriggerParam) error {
 		}
 	}()
 	// 这里会阻塞等待
+	log.Println("000999")
 	select {
 	case <-ctx.Done():
 		log.Println("ctx.Done()")
 	}
+	log.Println("..--..")
+	// 任务完成，从队列里删除
 	biz.RunningList.Mutex.Lock()
 	delete(biz.RunningList.RunningContextMap, jobId)
 	biz.RunningList.Mutex.Unlock()
