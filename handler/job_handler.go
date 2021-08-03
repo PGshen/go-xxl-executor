@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"errors"
 	"github.com/PGshen/go-xxl-executor/biz"
 	"github.com/PGshen/go-xxl-executor/common"
@@ -44,7 +45,12 @@ type MethodJobHandler struct {
 }
 
 func (receiver *MethodJobHandler) Execute(param Param) biz.ReturnT {
-	log.Println("begin to execute...")
+	paramBytes, err := json.Marshal(param)
+	if err != nil {
+		return biz.ReturnT{}
+	}
+	paramStr := string(paramBytes)
+	log.Println("begin to execute job, receive param: " + paramStr)
 	return biz.NewReturnT(common.SuccessCode, "success")
 }
 

@@ -76,6 +76,8 @@ func doTask(jobId int, taskQueue *biz.TaskQueue) {
 		task := taskQueue.TodoTasks[0]
 		taskQueue.TodoTasks = taskQueue.TodoTasks[1:]
 		taskQueue.Mutex.Unlock()
+		// todo使用waitGroup阻塞在这儿
+		// todo任务参数替换为Context
 		_ = triggerTask(task)
 	}
 	// 当前jobId对于的任务都跑完了
