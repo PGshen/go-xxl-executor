@@ -59,14 +59,22 @@ func trigger(task model.TriggerParam) error {
 	biz.RunningList.Lock()
 	biz.RunningList.RunningContextMap[jobId] = &biz.RunningContext{Ctx: ctx, Cancel: cancel}
 	biz.RunningList.Unlock()
-	var ret = make(chan biz.ReturnT)
-	go func(ch chan biz.ReturnT) {
-		ret, err := execTask(cancel, task)
+	go func() {
+		_, err := execTask(cancel, task)
 		if err != nil {
 			log.Println(err)
 		}
-		ch <- ret
-	}(ret)
+		// 正常执行完成吗
+		if biz.RemoveLogIdFromSet(task.LogId) {
+			// 是的
+			biz.AddExecutionRetToQueue(model.HandleCallbackParam{
+				LogId:      0,
+				LogDateTim: 0,
+				HandleCode: 0,
+				HandleMsg:  "",
+			})
+		}
+	}()
 	// 这里会阻塞等待
 	log.Println("000999")
 	select {
@@ -74,7 +82,11 @@ func trigger(task model.TriggerParam) error {
 		log.Println("ctx.Done()")
 		err := ctx.Err()
 		if err == nil {
-			// 正常退出
+			// 正常退出or手动取消
+			if biz.RemoveLogIdFromSet(task.LogId) {
+				// 手动取消，因为如果是正常退出的话，logId已被移除
+			}
+
 		}
 		if strings.Contains(err.Error(), "context deadline exceeded") {
 			// 超时退出

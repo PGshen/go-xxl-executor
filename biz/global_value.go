@@ -12,7 +12,7 @@ var (
 	DispatchReqQueue  = DispatchReq{JobTaskQueueMap: make(map[int]*TaskQueue)}            // 调度请求队列 key为jobId
 	ExecutionRetQueue = RetQueue{TodoCallbackRets: make([]model.HandleCallbackParam, 50)} // 执行结果队列 key为JobId
 	RunningList       = Running{RunningContextMap: make(map[int]*RunningContext)}         // 运行队列
-	TriggerLogIdSet   = LogIdSet{LogIdSet: make(map[int]int64, 200)}                      // 触发ID，即logId集合，避免重复触发和重复回调
+	TriggerLogIdSet   = LogIdSet{LogIdSet: make(map[int64]int64, 200)}                      // 触发ID，即logId集合，避免重复触发和重复回调
 )
 
 type DispatchReq struct {
@@ -22,7 +22,7 @@ type DispatchReq struct {
 
 type LogIdSet struct {
 	sync.Mutex
-	LogIdSet map[int]int64
+	LogIdSet map[int64]int64
 }
 
 type Running struct {
@@ -72,7 +72,7 @@ func PopExecutionRetFromQueue() ([]model.HandleCallbackParam, bool) {
 }
 
 // AddLogIdToSet 加入
-func AddLogIdToSet(logId int) bool {
+func AddLogIdToSet(logId int64) bool {
 	TriggerLogIdSet.Lock()
 	if _, ok := TriggerLogIdSet.LogIdSet[logId]; ok {
 		// 已存在
@@ -85,7 +85,7 @@ func AddLogIdToSet(logId int) bool {
 }
 
 // RemoveLogIdFromSet 移除
-func RemoveLogIdFromSet(logId int) bool {
+func RemoveLogIdFromSet(logId int64) bool {
 	TriggerLogIdSet.Lock()
 	if _, ok := TriggerLogIdSet.LogIdSet[logId]; ok {
 		// 存在,移除
