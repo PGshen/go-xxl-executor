@@ -12,3 +12,6 @@ xxl_job:
       port: 9998
       log_path: ./data/applogs/xxl-job/jobhandler
       log_retention_days: 30
+
+http:
+  timeout: 5

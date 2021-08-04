@@ -13,6 +13,7 @@ var (
 
 type Conf struct {
 	XxlJob XxlJob `yaml:"xxl_job"`
+	Http Http `yaml:"http"`
 }
 
 type XxlJob struct {
@@ -32,6 +33,10 @@ type XxlJobExecutor struct {
 	Port int `yaml:"port"`
 	LogPath string `yaml:"log_path"`
 	LogRetentionDays int `yaml:"log_retention_days"`
+}
+
+type Http struct {
+	Timeout int `yaml:"timeout"`
 }
 
 func init() {
