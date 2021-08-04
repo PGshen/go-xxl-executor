@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/PGshen/go-xxl-executor/biz"
 	"github.com/PGshen/go-xxl-executor/biz/model"
+	"github.com/PGshen/go-xxl-executor/common"
 	"github.com/PGshen/go-xxl-executor/handler"
 	"log"
 	"strconv"
@@ -42,7 +43,7 @@ func doTask(jobId int, taskQueue *biz.TaskQueue) {
 		taskQueue.Unlock()
 		_ = trigger(task)
 	}
-	// 当前jobId对于的任务都跑完了,这里可能有bug
+	// 当前jobId对于的任务都跑完了,这里可能有bug,会不会影响上面的遍历？？
 	biz.DispatchReqQueue.Lock()
 	delete(biz.DispatchReqQueue.JobTaskQueueMap, jobId)
 	log.Println("JobTaskQueueMap remove jobId: " + strconv.Itoa(jobId))
@@ -54,25 +55,37 @@ func trigger(task model.TriggerParam) error {
 	jobId := task.JobId
 	// todo使用waitGroup阻塞在这儿
 	// todo任务参数替换为Context
-	timeout := time.Second * time.Duration(task.ExecutorTimeout)
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	var ctx context.Context
+	var cancel context.CancelFunc
+	if task.ExecutorTimeout > 0 {
+		// 有超时
+		timeout := time.Second * time.Duration(task.ExecutorTimeout)
+		ctx, cancel = context.WithTimeout(context.Background(), timeout)
+	} else {
+		// 无超时
+		ctx, cancel = context.WithCancel(context.Background())
+	}
 	biz.RunningList.Lock()
 	biz.RunningList.RunningContextMap[jobId] = &biz.RunningContext{Ctx: ctx, Cancel: cancel}
 	biz.RunningList.Unlock()
+	biz.AddLogIdToSet(task.LogId)
 	go func() {
-		_, err := execTask(cancel, task)
+		ret, err := execTask(cancel, task)
 		if err != nil {
 			log.Println(err)
 		}
 		// 正常执行完成吗
 		if biz.RemoveLogIdFromSet(task.LogId) {
 			// 是的
+			log.Println("Task[" + strconv.FormatInt(task.LogId,10) + "]: complete normally")
 			biz.AddExecutionRetToQueue(model.HandleCallbackParam{
-				LogId:      0,
-				LogDateTim: 0,
-				HandleCode: 0,
-				HandleMsg:  "",
+				LogId:      task.LogId,
+				LogDateTim: time.Now().Unix(),
+				HandleCode: ret.Code,
+				HandleMsg:  ret.Msg,
 			})
+		} else {
+			log.Println("Task[" + strconv.FormatInt(task.LogId,10) + "] has been terminated due to timeout or killed")
 		}
 	}()
 	// 这里会阻塞等待
@@ -81,15 +94,29 @@ func trigger(task model.TriggerParam) error {
 	case <-ctx.Done():
 		log.Println("ctx.Done()")
 		err := ctx.Err()
-		if err == nil {
+		if err == nil || strings.Contains(err.Error(), "context canceled") {
 			// 正常退出or手动取消
 			if biz.RemoveLogIdFromSet(task.LogId) {
+				log.Println("Task[" + strconv.FormatInt(task.LogId,10) + "]: kill manually")
 				// 手动取消，因为如果是正常退出的话，logId已被移除
+				biz.AddExecutionRetToQueue(model.HandleCallbackParam{
+					LogId:      task.LogId,
+					LogDateTim: time.Now().Unix(),
+					HandleCode: common.FailCode,
+					HandleMsg:  "kill manually",
+				})
 			}
-
-		}
-		if strings.Contains(err.Error(), "context deadline exceeded") {
+			// 正常退出，之前已处理过，不必再其他操作
+		} else if strings.Contains(err.Error(), "context deadline exceeded") {
 			// 超时退出
+			log.Println("Task[" + strconv.FormatInt(task.LogId,10) + "]: timeout exit")
+			biz.RemoveLogIdFromSet(task.LogId)
+			biz.AddExecutionRetToQueue(model.HandleCallbackParam{
+				LogId:      task.LogId,
+				LogDateTim: time.Now().Unix(),
+				HandleCode: common.FailCode,
+				HandleMsg:  "timeout",
+			})
 		}
 	}
 	log.Println("..--..")
@@ -102,6 +129,7 @@ func trigger(task model.TriggerParam) error {
 
 // 跑任务
 func execTask(cancel context.CancelFunc, triggerParam model.TriggerParam) (biz.ReturnT, error) {
+	// 找到相应的JobHandler
 	executorHandler := triggerParam.ExecutorHandler
 	jobHandler := handler.GetJobHandler(executorHandler)
 	if jobHandler == nil {

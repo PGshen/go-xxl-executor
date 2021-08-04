@@ -3,6 +3,7 @@ package biz
 import (
 	"context"
 	"github.com/PGshen/go-xxl-executor/biz/model"
+	"log"
 	"sync"
 	"time"
 )
@@ -10,9 +11,9 @@ import (
 // 全局变量
 var (
 	DispatchReqQueue  = DispatchReq{JobTaskQueueMap: make(map[int]*TaskQueue)}            // 调度请求队列 key为jobId
-	ExecutionRetQueue = RetQueue{TodoCallbackRets: make([]model.HandleCallbackParam, 50)} // 执行结果队列 key为JobId
-	RunningList       = Running{RunningContextMap: make(map[int]*RunningContext)}         // 运行队列
-	TriggerLogIdSet   = LogIdSet{LogIdSet: make(map[int64]int64, 200)}                      // 触发ID，即logId集合，避免重复触发和重复回调
+	ExecutionRetQueue = RetQueue{TodoCallbackRets: []model.HandleCallbackParam{}} // 执行结果队列 key为JobId
+	RunningList       = Running{RunningContextMap: make(map[int]*RunningContext)}         // 运行队列,是为了可以手动终止
+	TriggerLogIdSet   = LogIdSet{LogIdSet: map[int64]int64{}}                      // 触发ID，即logId集合，避免重复触发和重复回调
 )
 
 type DispatchReq struct {
@@ -50,6 +51,7 @@ type RetQueue struct {
 
 // 添加执行结果到队列
 func AddExecutionRetToQueue(item model.HandleCallbackParam) {
+	log.Println("AddExecutionRetToQueue")
 	ExecutionRetQueue.Lock()
 	var todoCallbackRets = ExecutionRetQueue.TodoCallbackRets
 	todoCallbackRets = append(todoCallbackRets, item)

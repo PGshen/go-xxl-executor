@@ -8,11 +8,10 @@ import (
 )
 
 func main() {
-	server.Start()	// 启动http服务
 	// 注册JobHandler
 	_ = handler.AddJobHandler("test", &app.TestJobHandler{})
-	// 启动执行器服务
 	xxlExecutor := executor.NewXxlJobExecutor()
+	server.Start(xxlExecutor.GetIp(), xxlExecutor.GetPort()) // 启动http服务
+	xxlExecutor.Start()                    // 启动执行器服务
 	defer xxlExecutor.Destroy()
-	xxlExecutor.Start()
 }

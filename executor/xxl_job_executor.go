@@ -66,3 +66,18 @@ func NewXxlJobExecutor() XxlJobExecutor {
 		logRetentionDays: logRetentionDays,
 	}
 }
+
+func (executor XxlJobExecutor)GetAddress() string {
+	return executor.address
+}
+
+
+func (executor XxlJobExecutor)GetIp() string {
+	return executor.ip
+}
+
+
+func (executor XxlJobExecutor)GetPort() int {
+	return executor.port
+}
+

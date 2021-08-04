@@ -8,24 +8,26 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strconv"
 )
 
 var executorBiz = biz.ExecutorBiz{}
 
 // 启动http服务import cycle not allowed
 
-func Start() {
-	go startServer()
+func Start(ip string, port int) {
+	go startServer(ip, port)
 }
 
-func startServer() {
+func startServer(ip string, port int) {
+	addr := ip + ":" + strconv.Itoa(port)
 	log.Printf("http server start...")
 	http.HandleFunc("/beat", beat)
 	http.HandleFunc("/idleBeat", idleBeat)
 	http.HandleFunc("/run", run)
 	http.HandleFunc("/kill", kill)
 	http.HandleFunc("/log", loglog)
-	log.Fatal(http.ListenAndServe("127.0.0.1:8088", nil))
+	log.Fatal(http.ListenAndServe(addr, nil))
 }
 
 // 心跳检测
