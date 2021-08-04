@@ -23,7 +23,7 @@ type XxlJob struct {
 }
 
 type XxlJobAdmin struct {
-	Address string `yaml:"address"`
+	Address string `yaml:"addresses"`
 }
 
 type XxlJobExecutor struct {

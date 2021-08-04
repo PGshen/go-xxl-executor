@@ -6,7 +6,7 @@ xxl_job:
     access_token:
     executor:
       # 执行器的appname
-      appname: xxl-job-executor-sample
+      appname: go-xxl-executor-sample
       address:
       ip:
       port: 9998

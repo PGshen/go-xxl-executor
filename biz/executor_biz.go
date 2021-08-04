@@ -36,18 +36,18 @@ func (e *ExecutorBiz) Run(param model.TriggerParam) ReturnT {
 	// 这里需要注意加锁的位置，操作JobTaskQueueMap和todoTasks分别是不同的锁
 	if taskQueue, ok := DispatchReqQueue.JobTaskQueueMap[jobId]; ok {
 		// jobId任务已在队列
-		taskQueue.Mutex.Lock()
+		taskQueue.Lock()
 		var todoTasks = taskQueue.TodoTasks
 		// todo 增加logId判断，避免重复触发
 		todoTasks = append(todoTasks, param)
 		taskQueue.TodoTasks = todoTasks
-		taskQueue.Mutex.Unlock()
+		taskQueue.Unlock()
 	} else {
 		// jobId任务不在队列
-		DispatchReqQueue.Mutex.Lock()
+		DispatchReqQueue.Lock()
 		todoTasks := []model.TriggerParam{param}
 		DispatchReqQueue.JobTaskQueueMap[jobId] = &TaskQueue{Running: false, TodoTasks: todoTasks}
-		DispatchReqQueue.Mutex.Unlock()
+		DispatchReqQueue.Unlock()
 	}
 	log.Println("add a task[jobId=" + strconv.Itoa(jobId) + "] to dispatchReqQueue")
 	return NewReturnT(common.SuccessCode, "run success")
@@ -59,9 +59,9 @@ func (e *ExecutorBiz) Kill(param model.KillParam) ReturnT {
 	if runningCtx, ok := RunningList.RunningContextMap[jobId]; ok {
 		runningCtx.Cancel()
 		log.Println("kill job manually! jobId = " + strconv.Itoa(jobId))
-		RunningList.Mutex.Lock()
+		RunningList.Lock()
 		delete(RunningList.RunningContextMap, jobId)	// 从运行中队列里移除
-		RunningList.Mutex.Unlock()
+		RunningList.Unlock()
 		return NewReturnT(common.SuccessCode, "kill success")
 	} else {
 		return NewFailReturnT("current Job[jobId = " + strconv.Itoa(jobId) + "] does not running...")
