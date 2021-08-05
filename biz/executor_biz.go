@@ -32,36 +32,22 @@ func (e *ExecutorBiz) IdleBeat(param model.IdleBeatParam) ReturnT {
 
 // Run 运行
 func (e *ExecutorBiz) Run(param model.TriggerParam) ReturnT {
-	jobId := param.JobId
-	// 这里需要注意加锁的位置，操作JobTaskQueueMap和todoTasks分别是不同的锁
-	if taskQueue, ok := DispatchReqQueue.JobTaskQueueMap[jobId]; ok {
-		// jobId任务已在队列
-		taskQueue.Lock()
-		var todoTasks = taskQueue.TodoTasks
-		// todo 增加logId判断，避免重复触发
-		todoTasks = append(todoTasks, param)
-		taskQueue.TodoTasks = todoTasks
-		taskQueue.Unlock()
+	if AddLogIdToSet(param.LogId) {	// 判断当前logId是否已经在集合里，若是表明已经触发过，不在重新触发
+		AddDispatchReqToQueue(param)
+		log.Println("add a task[jobId=" + strconv.Itoa(param.JobId) + "] to dispatchReqQueue")
+		return NewReturnT(common.SuccessCode, "run success")
 	} else {
-		// jobId任务不在队列
-		DispatchReqQueue.Lock()
-		todoTasks := []model.TriggerParam{param}
-		DispatchReqQueue.JobTaskQueueMap[jobId] = &TaskQueue{Running: false, TodoTasks: todoTasks}
-		DispatchReqQueue.Unlock()
+		log.Println("logId[" + strconv.FormatInt(param.LogId, 10) + "] already in queue")
+		return NewFailReturnT("logId[" + strconv.FormatInt(param.LogId, 10) + "] already in queue")
 	}
-	log.Println("add a task[jobId=" + strconv.Itoa(jobId) + "] to dispatchReqQueue")
-	return NewReturnT(common.SuccessCode, "run success")
 }
 
 // Kill 终止 这里传入的是jobId,目前只终止了当前正在运行的；需要终止所有正在队列里排队的任务吗？或者说传入logId是否更合适？？
 func (e *ExecutorBiz) Kill(param model.KillParam) ReturnT {
 	jobId := param.JobId
-	if runningCtx, ok := RunningList.RunningContextMap[jobId]; ok {
-		runningCtx.Cancel()
+	if runningCtx, ok := PopRunningCtxFromList(jobId); ok {
+		runningCtx.Cancel()	// 通过context取消
 		log.Println("kill job manually! jobId = " + strconv.Itoa(jobId))
-		RunningList.Lock()
-		delete(RunningList.RunningContextMap, jobId)	// 从运行中队列里移除
-		RunningList.Unlock()
 		return NewReturnT(common.SuccessCode, "kill success")
 	} else {
 		return NewFailReturnT("current Job[jobId = " + strconv.Itoa(jobId) + "] does not running...")

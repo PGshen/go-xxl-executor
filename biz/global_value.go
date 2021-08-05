@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/PGshen/go-xxl-executor/biz/model"
 	"log"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -49,7 +50,51 @@ type RetQueue struct {
 	TodoCallbackRets []model.HandleCallbackParam
 }
 
-// 添加执行结果到队列
+// AddDispatchReqToQueue 添加调度请求到队列
+func AddDispatchReqToQueue(param model.TriggerParam) {
+	jobId := param.JobId
+	// 这里需要注意加锁的位置，操作JobTaskQueueMap和todoTasks分别是不同的锁
+	if taskQueue, ok := DispatchReqQueue.JobTaskQueueMap[jobId]; ok {
+		// jobId任务已在队列
+		taskQueue.Lock()
+		var todoTasks = taskQueue.TodoTasks
+		todoTasks = append(todoTasks, param)
+		taskQueue.TodoTasks = todoTasks
+		taskQueue.Unlock()
+	} else {
+		// jobId任务不在队列
+		DispatchReqQueue.Lock()
+		todoTasks := []model.TriggerParam{param}
+		DispatchReqQueue.JobTaskQueueMap[jobId] = &TaskQueue{Running: false, TodoTasks: todoTasks}
+		DispatchReqQueue.Unlock()
+	}
+}
+
+// RemoveDispatchReqFromQueue 只有当任务队列为空时，才用map中移除
+func RemoveDispatchReqFromQueue(jobId int) bool {
+	DispatchReqQueue.Lock()
+	if taskQueue, ok := DispatchReqQueue.JobTaskQueueMap[jobId]; ok {
+		if len(taskQueue.TodoTasks) == 0 {
+			delete(DispatchReqQueue.JobTaskQueueMap, jobId)
+			DispatchReqQueue.Unlock()
+			return true
+		} else {
+			// 任务队列不为空
+			DispatchReqQueue.Unlock()
+			return false
+		}
+	} else {
+		DispatchReqQueue.Unlock()
+		return true
+	}
+}
+
+// 取一个未被协程领取的调度任务
+func GetDispatchReqFromQueue() (jobId int, queue *TaskQueue){
+	// 通过running队列判断
+}
+
+// AddExecutionRetToQueue 添加执行结果到队列
 func AddExecutionRetToQueue(item model.HandleCallbackParam) {
 	log.Println("AddExecutionRetToQueue")
 	ExecutionRetQueue.Lock()
@@ -59,7 +104,7 @@ func AddExecutionRetToQueue(item model.HandleCallbackParam) {
 	ExecutionRetQueue.Unlock()
 }
 
-// 从执行结果队列获取
+// PopExecutionRetFromQueue 从执行结果队列获取
 func PopExecutionRetFromQueue() ([]model.HandleCallbackParam, bool) {
 	ExecutionRetQueue.Lock()
 	if len(ExecutionRetQueue.TodoCallbackRets) == 0 {
@@ -70,6 +115,33 @@ func PopExecutionRetFromQueue() ([]model.HandleCallbackParam, bool) {
 		ExecutionRetQueue.TodoCallbackRets = ExecutionRetQueue.TodoCallbackRets[:0]
 		ExecutionRetQueue.Unlock()
 		return params, true
+	}
+}
+
+// AddRunningToList 添加运行中的任务
+func AddRunningToList(jobId int, runningContext *RunningContext) bool {
+	RunningList.Lock()
+	if _, ok := RunningList.RunningContextMap[jobId]; ok {
+		log.Println("jobId[" + strconv.Itoa(jobId) + "] already in list")
+		RunningList.Unlock()
+		return false
+	} else {
+		RunningList.RunningContextMap[jobId] = runningContext
+		RunningList.Unlock()
+		return true
+	}
+}
+
+// PopRunningCtxFromList 弹出运行中的任务
+func PopRunningCtxFromList(jobId int) (*RunningContext,bool) {
+	RunningList.Lock()
+	if runningCtx, ok := RunningList.RunningContextMap[jobId]; ok {
+		delete(RunningList.RunningContextMap, jobId)	// 从运行中队列里移除
+		RunningList.Unlock()
+		return runningCtx, true
+	} else {
+		RunningList.Unlock()
+		return nil, false
 	}
 }
 

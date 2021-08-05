@@ -16,6 +16,7 @@ import (
 func StartWorker() {
 	// 轮询DispatchReqQueue
 	for {
+		// 这里的遍历是否安全？？待确认
 		for jobId, taskQueue := range biz.DispatchReqQueue.JobTaskQueueMap {
 			log.Println("check jobId: " + strconv.Itoa(jobId))
 			// 当前jobId没有goroutine跑，那就启动一个
@@ -43,12 +44,14 @@ func doTask(jobId int, taskQueue *biz.TaskQueue) {
 		taskQueue.Unlock()
 		_ = trigger(task)
 	}
-	// 当前jobId对于的任务都跑完了,这里可能有bug,会不会影响上面的遍历？？
-	biz.DispatchReqQueue.Lock()
-	delete(biz.DispatchReqQueue.JobTaskQueueMap, jobId)
-	log.Println("JobTaskQueueMap remove jobId: " + strconv.Itoa(jobId))
-	biz.DispatchReqQueue.Unlock()
-	log.Println("TodoTasks is empty, exists current goroutine...")
+	// 当前jobId对于的任务都跑完了,那么移除,这里可能有bug,会不会影响上面的遍历？？
+	if biz.RemoveDispatchReqFromQueue(jobId) {
+		log.Println("JobTaskQueueMap remove jobId: " + strconv.Itoa(jobId))
+		log.Println("TodoTasks is empty, exists current goroutine...")
+	} else {
+		// 再次进入，是否真的需要？？？
+		doTask(jobId, taskQueue)
+	}
 }
 
 func trigger(task model.TriggerParam) error {
@@ -65,10 +68,8 @@ func trigger(task model.TriggerParam) error {
 		// 无超时
 		ctx, cancel = context.WithCancel(context.Background())
 	}
-	biz.RunningList.Lock()
-	biz.RunningList.RunningContextMap[jobId] = &biz.RunningContext{Ctx: ctx, Cancel: cancel}
-	biz.RunningList.Unlock()
-	biz.AddLogIdToSet(task.LogId)
+	var runningCtx = &biz.RunningContext{Ctx: ctx, Cancel: cancel}
+	biz.AddRunningToList(jobId, runningCtx)
 	go func() {
 		ret, err := execTask(cancel, task)
 		if err != nil {
@@ -121,9 +122,7 @@ func trigger(task model.TriggerParam) error {
 	}
 	log.Println("..--..")
 	// 任务完成，从队列里删除
-	biz.RunningList.Lock()
-	delete(biz.RunningList.RunningContextMap, jobId)
-	biz.RunningList.Unlock()
+	biz.PopRunningCtxFromList(jobId)
 	return nil
 }
 
