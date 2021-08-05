@@ -28,6 +28,7 @@ func (executor XxlJobExecutor) Start() {
 	go goroutine.StartRegistry(executor.appname, executor.address)	// 注册协程
 	go goroutine.StartWorker() // 单独一个线程轮询
 	go goroutine.StartCallback()	// 回调协程
+	go goroutine.StartCleanLog()	// 日志定期清理
 	wg.Wait()
 }
 
