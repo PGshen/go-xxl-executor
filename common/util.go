@@ -3,6 +3,7 @@ package common
 import (
 	"log"
 	"net"
+	"os"
 )
 
 // 获取内网IP
@@ -25,4 +26,13 @@ func GetInternalIp() string {
 		}
 	}
 	return "127.0.0.1"
+}
+
+func IsDirExists(fileAddr string)bool{
+	s,err:=os.Stat(fileAddr)
+	if err!=nil{
+		log.Println(err)
+		return false
+	}
+	return s.IsDir()
 }

@@ -11,11 +11,16 @@ import (
 
 // 全局变量
 var (
-	DispatchReqQueue  = DispatchReq{JobTaskQueueMap: make(map[int]*TaskQueue)}            // 调度请求队列 key为jobId
+	DispatchReqQueue  = DispatchReq{JobTaskQueueMap: make(map[int]*TaskQueue)}    // 调度请求队列 key为jobId
 	ExecutionRetQueue = RetQueue{TodoCallbackRets: []model.HandleCallbackParam{}} // 执行结果队列 key为JobId
-	RunningList       = Running{RunningContextMap: make(map[int]*RunningContext)}         // 运行队列,是为了可以手动终止
-	TriggerLogIdSet   = LogIdSet{LogIdSet: map[int64]int64{}}                      // 触发ID，即logId集合，避免重复触发和重复回调
+	RunningList       = Running{RunningContextMap: make(map[int]*RunningContext)} // 运行队列,是为了可以手动终止
+	TriggerLogIdSet   = LogIdSet{LogIdSet: map[int64]int64{}}                     // 触发ID，即logId集合，避免重复触发和重复回调
 )
+
+// 阻塞处理策略
+const BLOCK_STRATEGY_SERIAL_EXECUTION = "SERIAL_EXECUTION"
+const BLOCK_STRATEGY_DISCARD_LATER = "DISCARD_LATER"
+const BLOCK_STRATEGY_COVER_EARLY = "COVER_EARLY"
 
 type DispatchReq struct {
 	sync.Mutex
@@ -70,7 +75,7 @@ func AddDispatchReqToQueue(param model.TriggerParam) {
 	}
 }
 
-// RemoveDispatchReqFromQueue 只有当任务队列为空时，才用map中移除
+// RemoveDispatchReqFromQueue 只有当任务队列为空时，才从map中移除
 func RemoveDispatchReqFromQueue(jobId int) bool {
 	DispatchReqQueue.Lock()
 	if taskQueue, ok := DispatchReqQueue.JobTaskQueueMap[jobId]; ok {
@@ -89,9 +94,58 @@ func RemoveDispatchReqFromQueue(jobId int) bool {
 	}
 }
 
-// 取一个未被协程领取的调度任务
-func GetDispatchReqFromQueue() (jobId int, queue *TaskQueue){
-	// 通过running队列判断
+// GetTaskQueue 获取jobId对应的任务队列
+func GetTaskQueue(jobId int) (*TaskQueue, bool) {
+	DispatchReqQueue.Lock()
+	taskQueue, ok := DispatchReqQueue.JobTaskQueueMap[jobId]
+	DispatchReqQueue.Unlock()
+	return taskQueue, ok
+}
+
+// GetDispatchReqFromQueue 取一个未被协程领取的调度任务。这里以jobId为单位，不关心todoTasks里面的
+func GetDispatchReqFromQueue() (jobId int, queue *TaskQueue, ok bool) {
+	// 通过running队列和DispatchReq队列快速判断，避免下面的循环
+	if len(RunningList.RunningContextMap) == len(DispatchReqQueue.JobTaskQueueMap) {
+		return 0, nil, false
+	}
+	// 上锁，快速获取所有的keys
+	DispatchReqQueue.Lock()
+	j := 0
+	jobIds := make([]int, len(DispatchReqQueue.JobTaskQueueMap))
+	for k := range DispatchReqQueue.JobTaskQueueMap {
+		jobIds[j] = k
+		j++
+	}
+	DispatchReqQueue.Unlock()
+	// 循环判断是否在运行中，返回一个没有被领取的jobId
+	for _, key := range jobIds {
+		if _, ok := RunningList.RunningContextMap[key]; ok {
+			// 当前jobId在运行中
+			continue
+		} else {
+			// 再此判断jobId是否还在DispatchReqQueue
+			DispatchReqQueue.Lock()
+			if taskQueue, yes := DispatchReqQueue.JobTaskQueueMap[key]; yes {
+				return key, taskQueue, true
+			}
+			DispatchReqQueue.Unlock()
+		}
+	}
+	return 0, nil, false
+}
+
+// 检查jobHandler是否空闲
+func CheckJobHandlerIsIdle(jobId int) (idle bool, msg string) {
+	if taskQueue, ok := DispatchReqQueue.JobTaskQueueMap[jobId]; ok {
+		// 当前JobHandler有任务正在运行中
+		if taskQueue.Running || len(taskQueue.TodoTasks) > 0 {
+			return false, "job goroutine is running."
+		} else {
+			return true, "job goroutine is idle."
+		}
+	} else {
+		return false, "jobId[" + strconv.Itoa(jobId) + "] does not exists."
+	}
 }
 
 // AddExecutionRetToQueue 添加执行结果到队列
@@ -133,10 +187,22 @@ func AddRunningToList(jobId int, runningContext *RunningContext) bool {
 }
 
 // PopRunningCtxFromList 弹出运行中的任务
-func PopRunningCtxFromList(jobId int) (*RunningContext,bool) {
+func PopRunningCtxFromList(jobId int) (*RunningContext, bool) {
 	RunningList.Lock()
 	if runningCtx, ok := RunningList.RunningContextMap[jobId]; ok {
-		delete(RunningList.RunningContextMap, jobId)	// 从运行中队列里移除
+		delete(RunningList.RunningContextMap, jobId) // 从运行中队列里移除
+		RunningList.Unlock()
+		return runningCtx, true
+	} else {
+		RunningList.Unlock()
+		return nil, false
+	}
+}
+
+// TakeRunningCtxFromList 获取运行中的任务
+func TakeRunningCtxFromList(jobId int) (*RunningContext, bool) {
+	RunningList.Lock()
+	if runningCtx, ok := RunningList.RunningContextMap[jobId]; ok {
 		RunningList.Unlock()
 		return runningCtx, true
 	} else {
@@ -156,6 +222,18 @@ func AddLogIdToSet(logId int64) bool {
 	TriggerLogIdSet.LogIdSet[logId] = time.Now().Unix()
 	TriggerLogIdSet.Unlock()
 	return true
+}
+
+// CheckLogIdIsInSet 检查logId是否在集合了
+func CheckLogIdIsInSet(logId int64) bool {
+	TriggerLogIdSet.Lock()
+	if _, ok := TriggerLogIdSet.LogIdSet[logId]; ok {
+		// 已存在
+		TriggerLogIdSet.Unlock()
+		return true
+	}
+	TriggerLogIdSet.Unlock()
+	return false
 }
 
 // RemoveLogIdFromSet 移除

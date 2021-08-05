@@ -10,7 +10,7 @@ xxl_job:
       address:
       ip:
       port: 9998
-      log_path: ./data/applogs/xxl-job/jobhandler
+      log_path: /Users/peng/StudioProjects/go/go-xxl-executor/log
       log_retention_days: 30
 
 http:

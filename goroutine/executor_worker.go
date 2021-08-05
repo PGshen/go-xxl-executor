@@ -6,6 +6,7 @@ import (
 	"github.com/PGshen/go-xxl-executor/biz"
 	"github.com/PGshen/go-xxl-executor/biz/model"
 	"github.com/PGshen/go-xxl-executor/common"
+	log2 "github.com/PGshen/go-xxl-executor/common/log"
 	"github.com/PGshen/go-xxl-executor/handler"
 	"log"
 	"strconv"
@@ -16,10 +17,14 @@ import (
 func StartWorker() {
 	// 轮询DispatchReqQueue
 	for {
-		// 这里的遍历是否安全？？待确认
-		for jobId, taskQueue := range biz.DispatchReqQueue.JobTaskQueueMap {
-			log.Println("check jobId: " + strconv.Itoa(jobId))
-			// 当前jobId没有goroutine跑，那就启动一个
+		for {
+			// 这里是以一个jobId为单位，一个jobId被一个协程领取
+			jobId, taskQueue, ok := biz.GetDispatchReqFromQueue()
+			if !ok {
+				// 没有未被领取的DispatchReq了，退出内循环，外面循环有个休眠，避免过度消耗
+				break
+			}
+			// 当前jobId没有goroutine跑，那就启动一个协程。再次判断队列里是否有任务
 			if !taskQueue.Running && len(taskQueue.TodoTasks) > 0 {
 				log.Println("start a goroutine for jobId[" + strconv.Itoa(jobId) + "]")
 				go doTask(jobId, taskQueue)
@@ -55,9 +60,9 @@ func doTask(jobId int, taskQueue *biz.TaskQueue) {
 }
 
 func trigger(task model.TriggerParam) error {
+	logger := common.GetLogger(task.LogId)
+	defer logger.Close()	// todo 待确认是否合适
 	jobId := task.JobId
-	// todo使用waitGroup阻塞在这儿
-	// todo任务参数替换为Context
 	var ctx context.Context
 	var cancel context.CancelFunc
 	if task.ExecutorTimeout > 0 {
@@ -68,10 +73,11 @@ func trigger(task model.TriggerParam) error {
 		// 无超时
 		ctx, cancel = context.WithCancel(context.Background())
 	}
+	// 将ctx, cancel加入到运行队列，方便手动kill
 	var runningCtx = &biz.RunningContext{Ctx: ctx, Cancel: cancel}
 	biz.AddRunningToList(jobId, runningCtx)
 	go func() {
-		ret, err := execTask(cancel, task)
+		ret, err := execTask(logger, cancel, task)
 		if err != nil {
 			log.Println(err)
 		}
@@ -79,6 +85,7 @@ func trigger(task model.TriggerParam) error {
 		if biz.RemoveLogIdFromSet(task.LogId) {
 			// 是的
 			log.Println("Task[" + strconv.FormatInt(task.LogId,10) + "]: complete normally")
+			logger.Info("Task[" + strconv.FormatInt(task.LogId,10) + "]: complete normally")
 			biz.AddExecutionRetToQueue(model.HandleCallbackParam{
 				LogId:      task.LogId,
 				LogDateTim: time.Now().Unix(),
@@ -87,9 +94,10 @@ func trigger(task model.TriggerParam) error {
 			})
 		} else {
 			log.Println("Task[" + strconv.FormatInt(task.LogId,10) + "] has been terminated due to timeout or killed")
+			logger.Warn("Task[" + strconv.FormatInt(task.LogId,10) + "] has been terminated due to timeout or killed")
 		}
 	}()
-	// 这里会阻塞等待
+	// 这里会阻塞等待，直到ctx.Done()
 	log.Println("000999")
 	select {
 	case <-ctx.Done():
@@ -99,6 +107,7 @@ func trigger(task model.TriggerParam) error {
 			// 正常退出or手动取消
 			if biz.RemoveLogIdFromSet(task.LogId) {
 				log.Println("Task[" + strconv.FormatInt(task.LogId,10) + "]: kill manually")
+				logger.Warn("Task[" + strconv.FormatInt(task.LogId,10) + "]: kill manually")
 				// 手动取消，因为如果是正常退出的话，logId已被移除
 				biz.AddExecutionRetToQueue(model.HandleCallbackParam{
 					LogId:      task.LogId,
@@ -111,6 +120,7 @@ func trigger(task model.TriggerParam) error {
 		} else if strings.Contains(err.Error(), "context deadline exceeded") {
 			// 超时退出
 			log.Println("Task[" + strconv.FormatInt(task.LogId,10) + "]: timeout exit")
+			logger.Warn("Task[" + strconv.FormatInt(task.LogId,10) + "]: timeout exit")
 			biz.RemoveLogIdFromSet(task.LogId)
 			biz.AddExecutionRetToQueue(model.HandleCallbackParam{
 				LogId:      task.LogId,
@@ -121,18 +131,19 @@ func trigger(task model.TriggerParam) error {
 		}
 	}
 	log.Println("..--..")
-	// 任务完成，从队列里删除
+	// 任务完成or超时or被杀，统一这里从队列里删除
 	biz.PopRunningCtxFromList(jobId)
 	return nil
 }
 
 // 跑任务
-func execTask(cancel context.CancelFunc, triggerParam model.TriggerParam) (biz.ReturnT, error) {
+func execTask(logger *log2.Logger, cancel context.CancelFunc, triggerParam model.TriggerParam) (biz.ReturnT, error) {
 	// 找到相应的JobHandler
 	executorHandler := triggerParam.ExecutorHandler
 	jobHandler := handler.GetJobHandler(executorHandler)
 	if jobHandler == nil {
 		log.Println("can not found the related executorHandler")
+		logger.Error("can not found the related executorHandler")
 		return biz.NewFailReturnT("jobHandler not exists"), errors.New("can not found the related executorHandler")
 	}
 	// 传递给任务的参数，其他参数不应给到任务
@@ -141,6 +152,7 @@ func execTask(cancel context.CancelFunc, triggerParam model.TriggerParam) (biz.R
 		ShardIndex: triggerParam.BroadcastIndex,
 		ShardTotal: triggerParam.BroadcastTotal,
 	}
+	jobHandler.SetLogger(logger)	// jobHandler完成后需要移除不？？
 	jobHandler.Init()
 	ret := jobHandler.Execute(param)
 	jobHandler.Destroy()

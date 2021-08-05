@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/PGshen/go-xxl-executor/biz"
 	"github.com/PGshen/go-xxl-executor/common"
+	log2 "github.com/PGshen/go-xxl-executor/common/log"
 	"log"
 )
 
@@ -22,6 +23,7 @@ type IJobHandler interface {
 	Init()
 	Execute(param Param) biz.ReturnT
 	Destroy()
+	SetLogger(logger *log2.Logger)
 }
 
 // AddJobHandler 注册JobHandler
@@ -42,6 +44,7 @@ func GetJobHandler(name string) IJobHandler {
 }
 
 type MethodJobHandler struct {
+	Log *log2.Logger
 }
 
 func (receiver *MethodJobHandler) Execute(param Param) biz.ReturnT {
@@ -60,4 +63,8 @@ func (receiver *MethodJobHandler) Init() {
 
 func (receiver *MethodJobHandler) Destroy() {
 	log.Println("destroy...")
+}
+
+func (receiver *MethodJobHandler) SetLogger(logger *log2.Logger) {
+	receiver.Log = logger
 }
