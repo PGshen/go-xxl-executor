@@ -3,7 +3,7 @@ package goroutine
 import (
 	"encoding/json"
 	"github.com/PGshen/go-xxl-executor/biz"
-	"log"
+	"github.com/PGshen/go-xxl-executor/common"
 	"time"
 )
 
@@ -12,7 +12,7 @@ func StartCallback() {
 	for {
 		if params, ok := biz.PopExecutionRetFromQueue(); ok {
 			paramsStr, _ := json.Marshal(params)
-			log.Println("callback: " + string(paramsStr))
+			common.Log.Info("callback: " + string(paramsStr))
 			biz.Callback(params)
 		} else {
 			time.Sleep(1 * time.Second)

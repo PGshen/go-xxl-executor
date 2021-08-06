@@ -3,13 +3,13 @@ package goroutine
 import (
 	"github.com/PGshen/go-xxl-executor/biz"
 	"github.com/PGshen/go-xxl-executor/biz/model"
-	"log"
+	"github.com/PGshen/go-xxl-executor/common"
 	"time"
 )
 
 // StartRegistry 执行器注册
 func StartRegistry(appname, address string) {
-	log.Println("start registry...")
+	common.Log.Info("start registry...")
 	param := model.RegistryParam{
 		RegistryGroup: "EXECUTOR",
 		RegistryKey: appname,
@@ -17,14 +17,14 @@ func StartRegistry(appname, address string) {
 	}
 	for {
 		biz.Registry(param)
-		log.Printf("[" + appname + "][" + address + "] registry beat...")
+		common.Log.Info("[" + appname + "][" + address + "] registry beat...")
 		time.Sleep(10 * time.Second)
 	}
 }
 
 // RemoveRegistry 执行器摘除
 func RemoveRegistry(appname, address string) {
-	log.Printf("remove registry...")
+	common.Log.Info("remove registry...")
 	param := model.RegistryParam{
 		RegistryGroup: "EXECUTOR",
 		RegistryKey: appname,

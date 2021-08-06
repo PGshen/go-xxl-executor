@@ -5,8 +5,7 @@ import (
 	"errors"
 	"github.com/PGshen/go-xxl-executor/biz"
 	"github.com/PGshen/go-xxl-executor/common"
-	log2 "github.com/PGshen/go-xxl-executor/common/log"
-	"log"
+	"github.com/PGshen/go-xxl-executor/common/log"
 )
 
 var (
@@ -23,7 +22,7 @@ type IJobHandler interface {
 	Init()
 	Execute(param Param) biz.ReturnT
 	Destroy()
-	SetLogger(logger *log2.Logger)
+	SetLogger(logger *log.Logger)
 }
 
 // AddJobHandler 注册JobHandler
@@ -44,7 +43,7 @@ func GetJobHandler(name string) IJobHandler {
 }
 
 type MethodJobHandler struct {
-	Log *log2.Logger
+	Log *log.Logger
 }
 
 func (receiver *MethodJobHandler) Execute(param Param) biz.ReturnT {
@@ -53,18 +52,18 @@ func (receiver *MethodJobHandler) Execute(param Param) biz.ReturnT {
 		return biz.ReturnT{}
 	}
 	paramStr := string(paramBytes)
-	log.Println("begin to execute job, receive param: " + paramStr)
+	common.Log.Info("begin to execute job, receive param: " + paramStr)
 	return biz.NewReturnT(common.SuccessCode, "success")
 }
 
 func (receiver *MethodJobHandler) Init() {
-	log.Println("init...")
+	common.Log.Info("init...")
 }
 
 func (receiver *MethodJobHandler) Destroy() {
-	log.Println("destroy...")
+	common.Log.Info("destroy...")
 }
 
-func (receiver *MethodJobHandler) SetLogger(logger *log2.Logger) {
+func (receiver *MethodJobHandler) SetLogger(logger *log.Logger) {
 	receiver.Log = logger
 }

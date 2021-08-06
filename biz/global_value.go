@@ -3,7 +3,7 @@ package biz
 import (
 	"context"
 	"github.com/PGshen/go-xxl-executor/biz/model"
-	"log"
+	"github.com/PGshen/go-xxl-executor/common"
 	"strconv"
 	"sync"
 	"time"
@@ -154,7 +154,7 @@ func CheckJobHandlerIsIdle(jobId int) (idle bool, msg string) {
 
 // AddExecutionRetToQueue 添加执行结果到队列
 func AddExecutionRetToQueue(item model.HandleCallbackParam) {
-	log.Println("AddExecutionRetToQueue")
+	common.Log.Info("AddExecutionRetToQueue")
 	ExecutionRetQueue.Lock()
 	var todoCallbackRets = ExecutionRetQueue.TodoCallbackRets
 	todoCallbackRets = append(todoCallbackRets, item)
@@ -180,7 +180,7 @@ func PopExecutionRetFromQueue() ([]model.HandleCallbackParam, bool) {
 func AddRunningToList(jobId int, runningContext *RunningContext) bool {
 	RunningList.Lock()
 	if _, ok := RunningList.RunningContextMap[jobId]; ok {
-		log.Println("jobId[" + strconv.Itoa(jobId) + "] already in list")
+		common.Log.Info("jobId[" + strconv.Itoa(jobId) + "] already in list")
 		RunningList.Unlock()
 		return false
 	} else {

@@ -7,7 +7,6 @@ import (
 	"github.com/PGshen/go-xxl-executor/common"
 	"io"
 	"io/ioutil"
-	"log"
 	"math/rand"
 	"net/http"
 	"strings"
@@ -24,20 +23,13 @@ var (
 
 const XXL_JOB_ACCESS_TOKEN = "XXL-JOB-ACCESS-TOKEN"
 
-func init() {
-	adminAddresses := common.Config.XxlJob.Admin.Address
-	accessToken := common.Config.XxlJob.AccessToken
-	timeout = time.Duration(common.Config.Http.Timeout)
-	initAdminBizClientList(adminAddresses, accessToken)
-}
-
 type AdminBizClient struct {
 	AdminAddress string
 	AccessToken string
 }
 
-// 初始化加载admin client的地址
-func initAdminBizClientList(adminAddresses, accessToken string) {
+// 初始化加载admin client
+func InitAdminBizClient(adminAddresses, accessToken string, httpTimeout int) {
 	if adminAddresses != "" && len(strings.TrimSpace(adminAddresses)) > 0 {
 		for _, adminAddress := range strings.Split(adminAddresses, ",") {
 			adminBiz := AdminBizClient{
@@ -47,6 +39,7 @@ func initAdminBizClientList(adminAddresses, accessToken string) {
 			adminBizClientList = append(adminBizClientList, adminBiz)
 		}
 	}
+	timeout = time.Duration(httpTimeout)
 }
 
 // GetAdminBizClientList 获取adminBiz列表
@@ -86,20 +79,20 @@ func post(uri string, method string, param interface{}) ReturnT {
 		jsonStr, _ := json.Marshal(param)
 		request, err := http.NewRequest(method, url, bytes.NewBuffer(jsonStr))
 		if request == nil || err != nil {
-			log.Println(err)
+			common.Log.Error(err)
 			continue
 		}
 		request.Header.Add("ContentType", "application/json")
 		request.Header.Add(XXL_JOB_ACCESS_TOKEN, adminBiz.AccessToken)
 		resp, err := client.Do(request)
 		if err != nil {
-			log.Println(err)
+			common.Log.Error(err)
 			continue
 		}
 		defer func(Body io.ReadCloser) {
 			err := Body.Close()
 			if err != nil {
-				log.Println(err)
+				common.Log.Info(err)
 			}
 		}(resp.Body)
 

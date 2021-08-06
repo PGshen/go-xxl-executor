@@ -3,6 +3,7 @@ package log
 import (
 	"os"
 	"testing"
+	"time"
 )
 
 func TestStdStreamLog(t *testing.T) {
@@ -49,5 +50,29 @@ func TestRotatingFileLog(t *testing.T) {
 	s.Error("Warning...")
 	s.Trace("Warning...")
 	s.Fatal("Warning...")
+	s.Close()
+}
+
+func TestTimeRotatingFileLog(t *testing.T) {
+	path := "./test_log"
+	os.RemoveAll(path)
+
+	os.Mkdir(path, 0777)
+	fileName := path + "/test.log"
+
+	h, err := NewTimeRotatingFileHandler(fileName, WhenMinute, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := NewDefault(h)
+	for {
+		s.Info("hello world")
+		s.Warn("Warning...")
+		s.Debug("Warning...")
+		s.Error("Warning...")
+		s.Trace("Warning...")
+		s.Fatal("Warning...")
+		time.Sleep(10 * time.Second)
+	}
 	s.Close()
 }

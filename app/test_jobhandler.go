@@ -5,7 +5,6 @@ import (
 	"github.com/PGshen/go-xxl-executor/biz"
 	"github.com/PGshen/go-xxl-executor/common"
 	"github.com/PGshen/go-xxl-executor/handler"
-	"log"
 	"strconv"
 	"time"
 )
@@ -14,6 +13,7 @@ import (
 // 1. "继承"handler.MethodJobHandler
 // 2. 业务逻辑实现写在Execute
 // 3. Init(), Destroy()属于钩子方法
+// 4. 关于receiver.Log,他将输出到xxl日志中。由于go没有提供类似threadLocal变量，只能自己携带了。。。
 
 type TestJobHandler struct {
 	handler.MethodJobHandler
@@ -21,13 +21,13 @@ type TestJobHandler struct {
 
 func (receiver *TestJobHandler) Execute(param handler.Param) biz.ReturnT {
 	receiver.MethodJobHandler.Execute(param)
-	log.Println("Test...")
-	log.Println("sleep 30s")
+	common.Log.Info("Test...")
 	jobParams := make(map[string]interface{})
 	_ = json.Unmarshal([]byte(param.JobParam), &jobParams)
 	times := int(jobParams["times"].(float64))
+	common.Log.Info("It will cycle " + strconv.Itoa(times) + " times")
 	for i := 0; i < times; i++ {
-		log.Println("Test running: " + strconv.Itoa(i))
+		common.Log.Info("Test running: " + strconv.Itoa(i))
 		receiver.Log.Info("Test running: " + strconv.Itoa(i))
 		time.Sleep(time.Second)
 	}
@@ -37,16 +37,16 @@ func (receiver *TestJobHandler) Execute(param handler.Param) biz.ReturnT {
 	receiver.Log.Error("Error...")
 	receiver.Log.Trace("Trace...")
 	receiver.Log.Fatal("Fatal...")
-	log.Println("Finish work!!!")
+	common.Log.Info("Finish work!!!")
 	return biz.NewReturnT(common.SuccessCode, "Test JobHandler")
 }
 //
 //func (receiver TestJobHandler) Init() {
-//	log.Println("init something...")
+//	log.Log.Info("init something...")
 //}
 
 func (receiver TestJobHandler) Destroy() {
-	log.Println("destroy...")
+	common.Log.Info("destroy...")
 }
 
 

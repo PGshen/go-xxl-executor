@@ -1,8 +1,8 @@
 package goroutine
 
 import (
+	"github.com/PGshen/go-xxl-executor/common"
 	"io/ioutil"
-	"log"
 	"os"
 	"strings"
 	"time"
@@ -18,7 +18,7 @@ func StartCleanLog(logPath string, logRetentionDays int) {
 		for _, dir := range dirs {
 			// 超过指定时间了，删掉
 			if int((time.Now().Unix() - dir.ModTime().Unix())/86400) >= logRetentionDays {
-				log.Println("remove: " + dir.Name())
+				common.Log.Info("remove: " + dir.Name())
 				if dir.IsDir() {
 					_ = os.RemoveAll(logPath + dir.Name())
 				} else {

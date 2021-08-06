@@ -165,16 +165,16 @@ func NewTimeRotatingFileHandler(baseName string, when int8, interval int) (*Time
 	switch when {
 	case WhenSecond:
 		h.interval = 1
-		h.suffix = "2006-01-02_15-04-05"
+		h.suffix = ".20060102150405"
 	case WhenMinute:
 		h.interval = 60
-		h.suffix = "2006-01-02_15-04"
+		h.suffix = ".200601021504"
 	case WhenHour:
 		h.interval = 3600
-		h.suffix = "2006-01-02_15"
+		h.suffix = ".2006010215"
 	case WhenDay:
 		h.interval = 3600 * 24
-		h.suffix = "2006-01-02"
+		h.suffix = ".20060102"
 	default:
 		return nil, fmt.Errorf("invalid when_rotate: %d", when)
 	}

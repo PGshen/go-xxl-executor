@@ -1,9 +1,10 @@
 package executor
 
 import (
+	"github.com/PGshen/go-xxl-executor/biz"
 	"github.com/PGshen/go-xxl-executor/common"
 	"github.com/PGshen/go-xxl-executor/goroutine"
-	"log"
+	"github.com/PGshen/go-xxl-executor/server"
 	"strconv"
 	"strings"
 	"sync"
@@ -18,36 +19,19 @@ type XxlJobExecutor struct {
 	port             int
 	logPath          string
 	logRetentionDays int
+	httpTimeout      int
 }
 
-// Start 启动
-func (executor XxlJobExecutor) Start() {
-	log.Println("executor start...")
-	var wg sync.WaitGroup
-	wg.Add(1)                  // todo 待完善终止机制
-	go goroutine.StartRegistry(executor.appname, executor.address)	// 注册协程
-	go goroutine.StartWorker() // 单独一个线程轮询
-	go goroutine.StartCallback()	// 回调协程
-	go goroutine.StartCleanLog(executor.logPath, executor.logRetentionDays)	// 日志定期清理
-	wg.Wait()
-}
-
-// Destroy 销毁
-func (executor XxlJobExecutor) Destroy() {
-	log.Println("executor destroy...")
-	goroutine.RemoveRegistry(executor.appname, executor.address)
-}
-
-func NewXxlJobExecutor() XxlJobExecutor {
-	conf := common.Config.XxlJob
-	adminAddress := conf.Admin.Address
+func NewXxlJobExecutor(conf XxlJobConfig) XxlJobExecutor {
+	adminAddress := conf.AdminAddress
 	accessToken := conf.AccessToken
-	appname := conf.Executor.Appname
-	address := conf.Executor.Address
-	ip := conf.Executor.Ip
-	port := conf.Executor.Port
-	logPath := conf.Executor.LogPath
-	logRetentionDays := conf.Executor.LogRetentionDays
+	appname := conf.Appname
+	address := conf.Address
+	ip := conf.Ip
+	port := conf.Port
+	logPath := conf.LogPath
+	logRetentionDays := conf.LogRetentionDays
+	httpTime := conf.HttpTimeout
 	// 如果address没填写则自动获取本机IP
 	if strings.TrimSpace(address) == "" {
 		if strings.TrimSpace(ip) == "" {
@@ -57,28 +41,37 @@ func NewXxlJobExecutor() XxlJobExecutor {
 		address = strings.ReplaceAll("http://ip:port", "ip:port", ipPort)
 	}
 	return XxlJobExecutor{
-		adminAddress: adminAddress,
-		accessToken: accessToken,
-		appname: appname,
-		address: address,
-		ip: ip,
-		port: port,
-		logPath: logPath,
+		adminAddress:     adminAddress,
+		accessToken:      accessToken,
+		appname:          appname,
+		address:          address,
+		ip:               ip,
+		port:             port,
+		logPath:          logPath,
 		logRetentionDays: logRetentionDays,
+		httpTimeout:      httpTime,
 	}
 }
 
-func (executor XxlJobExecutor)GetAddress() string {
-	return executor.address
+// Start 启动
+func (executor XxlJobExecutor) Start() {
+	defer executor.Destroy()
+	common.Log.Info("executor start...")
+	common.InitLogger(executor.logPath)
+	biz.InitAdminBizClient(executor.adminAddress, executor.accessToken, executor.httpTimeout)
+	biz.InitExecutorBiz(executor.logPath)
+	var wg sync.WaitGroup
+	wg.Add(1)                                                               // todo 待完善终止机制
+	go server.StartServer(executor.ip, executor.port)                       // 启动http服务
+	go goroutine.StartRegistry(executor.appname, executor.address)          // 注册协程
+	go goroutine.StartWorker()                                              // 单独一个线程轮询
+	go goroutine.StartCallback()                                            // 回调协程
+	go goroutine.StartCleanLog(executor.logPath, executor.logRetentionDays) // 日志定期清理
+	wg.Wait()
 }
 
-
-func (executor XxlJobExecutor)GetIp() string {
-	return executor.ip
+// Destroy 销毁
+func (executor XxlJobExecutor) Destroy() {
+	common.Log.Info("executor destroy...")
+	goroutine.RemoveRegistry(executor.appname, executor.address)
 }
-
-
-func (executor XxlJobExecutor)GetPort() int {
-	return executor.port
-}
-

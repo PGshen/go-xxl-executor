@@ -3,7 +3,6 @@ package common
 import (
 	"bufio"
 	"io"
-	"log"
 	"net"
 	"os"
 )
@@ -12,7 +11,7 @@ import (
 func GetInternalIp() string {
 	netInterfaces, err := net.Interfaces()
 	if err != nil {
-		log.Println("net.Interfaces failed, err:", err.Error())
+		Log.Info("net.Interfaces failed, err:", err.Error())
 		return "127.0.0.1"
 	}
 	for i := 0; i < len(netInterfaces); i++ {
@@ -34,7 +33,7 @@ func GetInternalIp() string {
 func IsDirExists(fileAddr string)bool{
 	s,err:=os.Stat(fileAddr)
 	if err!=nil{
-		log.Println(err)
+		Log.Info(err)
 		return false
 	}
 	return s.IsDir()
@@ -56,11 +55,11 @@ func ReadLog(fileAddr string, fromLineNum int) (string, int, bool) {
 	defer func(fd *os.File) {
 		err := fd.Close()
 		if err != nil {
-			log.Fatalln(err)
+			Log.Error(err)
 		}
 	}(fd)
 	if err != nil {
-		log.Fatalln("read error:", err)
+		Log.Error("read error:", err)
 	}
 	buff := bufio.NewReader(fd)
 	for {

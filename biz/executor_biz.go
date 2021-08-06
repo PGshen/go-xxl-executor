@@ -3,11 +3,16 @@ package biz
 import (
 	"github.com/PGshen/go-xxl-executor/biz/model"
 	"github.com/PGshen/go-xxl-executor/common"
-	"log"
 	"strconv"
 	"strings"
 	"time"
 )
+
+var logPath string
+
+func InitExecutorBiz(path string) {
+	logPath = path
+}
 
 type ExecutorBiz struct {
 }
@@ -40,7 +45,7 @@ func (e *ExecutorBiz) Run(param model.TriggerParam) ReturnT {
 			// 串行
 			AddDispatchReqToQueue(param)
 			AddLogIdToSet(param.LogId)
-			log.Println("add a task[jobId=" + strconv.Itoa(param.JobId) + ", logId= " + logId + "] to dispatchReqQueue")
+			common.Log.Info("add a task[jobId=" + strconv.Itoa(param.JobId) + ", logId= " + logId + "] to dispatchReqQueue")
 			return NewReturnT(common.SuccessCode, "run success")
 		} else if strings.EqualFold(blockStrategy, BLOCK_STRATEGY_DISCARD_LATER) {
 			// 丢弃后续,如果当前jobId有任务正在运行，那么丢弃当前调度
@@ -48,10 +53,10 @@ func (e *ExecutorBiz) Run(param model.TriggerParam) ReturnT {
 			if idle {
 				AddDispatchReqToQueue(param)
 				AddLogIdToSet(param.LogId)
-				log.Println("add a task[jobId=" + strconv.Itoa(param.JobId) + ", logId= " + logId + "] to dispatchReqQueue")
+				common.Log.Info("add a task[jobId=" + strconv.Itoa(param.JobId) + ", logId= " + logId + "] to dispatchReqQueue")
 				return NewReturnT(common.SuccessCode, "run success")
 			} else {
-				log.Println("jobHandler is busy, discard current dispatch[logId="+ logId + "]")
+				common.Log.Info("jobHandler is busy, discard current dispatch[logId="+ logId + "]")
 				return NewFailReturnT("jobHandler is busy, discard current dispatch[logId="+ logId + "]")
 			}
 		} else if strings.EqualFold(blockStrategy, BLOCK_STRATEGY_COVER_EARLY) {
@@ -70,19 +75,19 @@ func (e *ExecutorBiz) Run(param model.TriggerParam) ReturnT {
 						}
 					}
 					//RemoveDispatchReqFromQueue(jobId)
-					log.Println("kill job due to block strategy! jobId = " + strconv.Itoa(jobId))
+					common.Log.Info("kill job due to block strategy! jobId = " + strconv.Itoa(jobId))
 				}
 			}
 			AddDispatchReqToQueue(param)
 			AddLogIdToSet(param.LogId)
-			log.Println("add a task[jobId=" + strconv.Itoa(param.JobId) + ", logId= " + logId + "] to dispatchReqQueue")
+			common.Log.Info("add a task[jobId=" + strconv.Itoa(param.JobId) + ", logId= " + logId + "] to dispatchReqQueue")
 			return NewReturnT(common.SuccessCode, "run success")
 		} else {
-			log.Println("unknown block strategy!")
+			common.Log.Info("unknown block strategy!")
 			return NewFailReturnT("unknown block strategy!")
 		}
 	} else {
-		log.Println("logId[" + strconv.FormatInt(param.LogId, 10) + "] already in queue")
+		common.Log.Info("logId[" + strconv.FormatInt(param.LogId, 10) + "] already in queue")
 		return NewFailReturnT("logId[" + strconv.FormatInt(param.LogId, 10) + "] already in queue")
 	}
 }
@@ -92,7 +97,7 @@ func (e *ExecutorBiz) Kill(param model.KillParam) ReturnT {
 	jobId := param.JobId
 	if runningCtx, ok := TakeRunningCtxFromList(jobId); ok {
 		runningCtx.Cancel()	// 通过context取消
-		log.Println("kill job manually! jobId = " + strconv.Itoa(jobId))
+		common.Log.Info("kill job manually! jobId = " + strconv.Itoa(jobId))
 		return NewReturnT(common.SuccessCode, "kill success")
 	} else {
 		return NewFailReturnT("current Job[jobId = " + strconv.Itoa(jobId) + "] does not running...")
@@ -101,7 +106,6 @@ func (e *ExecutorBiz) Kill(param model.KillParam) ReturnT {
 
 // Log 查看日志
 func (e *ExecutorBiz) Log(param model.LogParam) ReturnT {
-	logPath := common.Config.XxlJob.Executor.LogPath
 	if !strings.HasSuffix(logPath, "/") {
 		logPath += "/"
 	}
