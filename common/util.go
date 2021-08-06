@@ -1,12 +1,14 @@
 package common
 
 import (
+	"bufio"
+	"io"
 	"log"
 	"net"
 	"os"
 )
 
-// 获取内网IP
+// GetInternalIp 获取内网IP
 func GetInternalIp() string {
 	netInterfaces, err := net.Interfaces()
 	if err != nil {
@@ -28,6 +30,7 @@ func GetInternalIp() string {
 	return "127.0.0.1"
 }
 
+// IsDirExists 目录是否存在
 func IsDirExists(fileAddr string)bool{
 	s,err:=os.Stat(fileAddr)
 	if err!=nil{
@@ -35,4 +38,40 @@ func IsDirExists(fileAddr string)bool{
 		return false
 	}
 	return s.IsDir()
+}
+
+func IsFileExist(path string) bool {
+	_, err := os.Lstat(path)
+	return !os.IsNotExist(err)
+}
+
+
+func ReadLog(fileAddr string, fromLineNum int) (string, int, bool) {
+	logContent := ""
+	lineNum := 0
+	if !IsFileExist(fileAddr) {
+		return "readLog fail, logFile not exists", 0, true
+	}
+	fd, err := os.Open(fileAddr)
+	defer func(fd *os.File) {
+		err := fd.Close()
+		if err != nil {
+			log.Fatalln(err)
+		}
+	}(fd)
+	if err != nil {
+		log.Fatalln("read error:", err)
+	}
+	buff := bufio.NewReader(fd)
+	for {
+		data, _, eof := buff.ReadLine()
+		if eof == io.EOF {
+			break
+		}
+		lineNum++
+		if lineNum >= fromLineNum {
+			logContent = logContent + (string(data)) + "\n"
+		}
+	}
+	return logContent, lineNum, false
 }

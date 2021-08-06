@@ -88,6 +88,17 @@ func kill(w http.ResponseWriter, r *http.Request) {
 
 // 查日志
 func loglog(w http.ResponseWriter, r *http.Request) {
+	//r.ParseForm()
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		log.Printf("read body err, %v\n", err)
+		return
+	}
+
 	var param model.LogParam
+	if err = json.Unmarshal(body, &param); err != nil {
+		log.Printf("Unmarshal err, %v\n", err)
+		return
+	}
 	_, _ = fmt.Fprintln(w, executorBiz.Log(param))
 }

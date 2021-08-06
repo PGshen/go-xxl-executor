@@ -5,10 +5,17 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
+	"time"
 )
 
 func GetLogger(logId int64) *log2.Logger {
 	logPath := Config.XxlJob.Executor.LogPath
+	if !strings.HasSuffix(logPath, "/") {
+		logPath += "/"
+	}
+	today := time.Now().Format("20060102")
+	logPath = logPath + today
 	if !IsDirExists(logPath) {
 		// 目录不存在则创建
 		_ = os.Mkdir(logPath, 0777)

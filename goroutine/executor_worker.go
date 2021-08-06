@@ -25,10 +25,13 @@ func StartWorker() {
 				break
 			}
 			// 当前jobId没有goroutine跑，那就启动一个协程。再次判断队列里是否有任务
+			taskQueue.Lock()
 			if !taskQueue.Running && len(taskQueue.TodoTasks) > 0 {
+				taskQueue.Running = true
 				log.Println("start a goroutine for jobId[" + strconv.Itoa(jobId) + "]")
 				go doTask(jobId, taskQueue)
 			}
+			taskQueue.Unlock()
 		}
 		time.Sleep(1000 * time.Millisecond)
 	}
@@ -36,7 +39,6 @@ func StartWorker() {
 
 // 一个协程跑一个jobId对应的任务
 func doTask(jobId int, taskQueue *biz.TaskQueue) {
-	taskQueue.Running = true
 	defer func() { taskQueue.Running = false }()
 	// 串行，暂未实现阻塞处理策略
 	for {
@@ -49,7 +51,7 @@ func doTask(jobId int, taskQueue *biz.TaskQueue) {
 		taskQueue.Unlock()
 		_ = trigger(task)
 	}
-	// 当前jobId对于的任务都跑完了,那么移除,这里可能有bug,会不会影响上面的遍历？？
+	// 当前jobId对于的任务都跑完了,那么移除，但有从上面循环退出到现在之间又有新的任务加入，所以再此判断
 	if biz.RemoveDispatchReqFromQueue(jobId) {
 		log.Println("JobTaskQueueMap remove jobId: " + strconv.Itoa(jobId))
 		log.Println("TodoTasks is empty, exists current goroutine...")

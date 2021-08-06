@@ -76,6 +76,7 @@ func AddDispatchReqToQueue(param model.TriggerParam) {
 }
 
 // RemoveDispatchReqFromQueue 只有当任务队列为空时，才从map中移除
+// 这个方法只能在executor_worker调用，多次调用会出问题的
 func RemoveDispatchReqFromQueue(jobId int) bool {
 	DispatchReqQueue.Lock()
 	if taskQueue, ok := DispatchReqQueue.JobTaskQueueMap[jobId]; ok {
@@ -126,6 +127,7 @@ func GetDispatchReqFromQueue() (jobId int, queue *TaskQueue, ok bool) {
 			// 再此判断jobId是否还在DispatchReqQueue
 			DispatchReqQueue.Lock()
 			if taskQueue, yes := DispatchReqQueue.JobTaskQueueMap[key]; yes {
+				DispatchReqQueue.Unlock()
 				return key, taskQueue, true
 			}
 			DispatchReqQueue.Unlock()
@@ -144,7 +146,9 @@ func CheckJobHandlerIsIdle(jobId int) (idle bool, msg string) {
 			return true, "job goroutine is idle."
 		}
 	} else {
-		return false, "jobId[" + strconv.Itoa(jobId) + "] does not exists."
+		// 是否需要判断jobId和appName之间的映射？？要的话这个关系在执行器保存多久呢？总不能一直保存不清理吧
+		// 现在先不校验这个关系，如果jobId不在运行列表，那就认为是空闲的
+		return true, "jobId[" + strconv.Itoa(jobId) + "] does not exists in running queue"
 	}
 }
 

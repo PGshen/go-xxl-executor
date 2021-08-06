@@ -6,6 +6,7 @@ import (
 	"log"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type ExecutorBiz struct {
@@ -60,7 +61,7 @@ func (e *ExecutorBiz) Run(param model.TriggerParam) ReturnT {
 				// 停止当前运行的
 				jobId := param.JobId
 				if runningCtx, ok := TakeRunningCtxFromList(jobId); ok {
-					runningCtx.Cancel()	// 通过context取消
+					runningCtx.Cancel()	// 通过context取消，前端提示是kill manually, 没方法区分出来
 					// 清空之前在排队的logId
 					taskQueue, yes := GetTaskQueue(jobId)
 					if yes {
@@ -68,7 +69,7 @@ func (e *ExecutorBiz) Run(param model.TriggerParam) ReturnT {
 							RemoveLogIdFromSet(task.LogId)
 						}
 					}
-					RemoveDispatchReqFromQueue(jobId)
+					//RemoveDispatchReqFromQueue(jobId)
 					log.Println("kill job due to block strategy! jobId = " + strconv.Itoa(jobId))
 				}
 			}
@@ -100,6 +101,24 @@ func (e *ExecutorBiz) Kill(param model.KillParam) ReturnT {
 
 // Log 查看日志
 func (e *ExecutorBiz) Log(param model.LogParam) ReturnT {
-	// todo
-	return NewReturnT(common.SuccessCode, "log success")
+	logPath := common.Config.XxlJob.Executor.LogPath
+	if !strings.HasSuffix(logPath, "/") {
+		logPath += "/"
+	}
+	// 获取日志位置
+	logId := param.LogId
+	logDateTim := param.LogDateTim
+	fromLineNum := param.FromLineNum
+	day := time.Unix(logDateTim/1000, 0).Format("20060102")
+	logAddr := logPath + day + "/" + strconv.FormatInt(logId, 10) + ".log"
+	logContent, toLineNum, isEnd := common.ReadLog(logAddr, fromLineNum)
+	logResult := model.LogResult{
+		FromLineNum: fromLineNum,
+		ToLineNum:   toLineNum,
+		LogContent:  logContent,
+		IsEnd:       isEnd,
+	}
+	returnT := NewReturnT(common.SuccessCode, "log success")
+	returnT.SetContent(logResult)
+	return returnT
 }
