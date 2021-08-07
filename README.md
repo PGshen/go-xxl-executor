@@ -113,8 +113,8 @@ TriggerLogIdSet   = LogIdSet{LogIdSet: map[int64]int64{}}                     //
 1. `[GetDispatchReqFromQueue]`从DispatchReqQueue获取一个未被协程领取的调度请求（以jobId为单位）**// 由于锁的问题，判断逻辑略显别扭**
 2. `[StartWorker]`给队列上锁，判断当前任务队列是否在运行中，如果没有并且任务数大于0，那么启动一个协程，否则跳过；最后解锁 **// 为了提高性能，DispatchReqQueue包含两次锁，第一次使用的外层锁，所以获取到的调度请求仍然可能被其他协程抢先领取占用，所以这里使用内部锁再次判断确保不被重复领取**
 3. `[doTask]`子协程轮询当前jobId的任务队列,触发任务(第4步)，直到所有任务完成，最后尝试将当前jobId从DispatchReqQueue中移除 **// 任务跑完后将jobId移除是为了防止jobId堆积，因为有些jobId可能跑完再也用不上了**
-4. `[trigger]`根据任务时候有超时使用不同的context,然后将context保存到运行队列集合中，然后启动一个子协程跑任务(第5步)，通过`select: <-ctx.Done`阻塞等待子协程退出或者是ctx被cancel了，根据ctx.Err()来判断是那种原因导致ctx.Done  **// 这里使用子协程来跑实际任务是为了支持超时和手动kill，如果不是子协程跑的话那么无法`终止`当前任务**
-5. `[execTask]`封装参数，然后调用JobHandler接口的实现，即自己的jobHandler业务逻辑 **// 正常执行完任务也需要调用cancel,因为父协程通过`ctx.Done`来阻塞的**
+4. `[trigger]`根据任务时候有超时使用不同的context,然后将context保存到运行队列集合中，然后启动一个子协程跑任务(第5步)，通过`select: <-ctx.Done`阻塞,等待任务完成或手工kill或者超时时，调用cancel方法，根据ctx.Err()来判断是那种原因导致ctx.Done  **// 这里使用子协程来跑实际任务是为了支持超时和手动kill，如果不是子协程跑的话那么无法`终止`当前任务**
+5. `[execTask]`封装参数，然后调用JobHandler接口的实现，即自己的jobHandler业务逻辑 **// 正常执行完任务也需要调用cancel,因为父协程通过`select: <-ctx.Done`来阻塞的**
 > 手动kill时，通过运行队列RunningList拿到context和cancel方法，然乎调用cancel即可ctx.Done完成；超时有context自动完成，最终也会ctx.Done.
 > 这也是为什么使用`select: <-ctx.Done`阻塞的原因
 
