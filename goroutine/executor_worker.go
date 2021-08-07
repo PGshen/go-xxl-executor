@@ -46,7 +46,6 @@ func doTask(jobId int, taskQueue *biz.TaskQueue) {
 		}
 	}()
 	defer func() { taskQueue.Running = false }()
-	// 串行，暂未实现阻塞处理策略
 	for {
 		if len(taskQueue.TodoTasks) == 0 {
 			break	// 所有任务跑完，退出任务循环

@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	JobHandlerRegistry map[string]IJobHandler = make(map[string]IJobHandler) // JobHandler列表
+	JobHandlerRegistry = make(map[string]IJobHandler) // JobHandler列表
 )
 
 type Param struct {

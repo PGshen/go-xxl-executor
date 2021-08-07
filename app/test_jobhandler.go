@@ -14,6 +14,7 @@ import (
 // 2. 业务逻辑实现写在Execute
 // 3. Init(), Destroy()属于钩子方法
 // 4. 关于receiver.Log,他将输出到xxl日志中。由于go没有提供类似threadLocal变量，只能自己携带了。。。
+// 5. 关于common.Log，他是执行器自身的日志，需要同receiver.Log区分开
 
 type TestJobHandler struct {
 	handler.MethodJobHandler
