@@ -202,7 +202,7 @@ func (h *TimeRotatingFileHandler) doRollover() {
 		h.fd.Close()
 		e := os.Rename(h.baseName, fName)
 		if e != nil {
-			panic(e)
+			panic(e.Error())
 		}
 
 		h.fd, _ = os.OpenFile(h.baseName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)

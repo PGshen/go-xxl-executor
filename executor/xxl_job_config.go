@@ -1,6 +1,7 @@
 package executor
 
 type XxlJobConfig struct {
+	Env              string // 环境，dev开发，test测试，prod生产
 	AdminAddress     string // 调度中心地址
 	AccessToken      string // 访问token
 	Appname          string // appname

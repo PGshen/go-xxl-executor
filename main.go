@@ -9,18 +9,19 @@ import (
 func main() {
 	// 初始化配置，这里根据自己的应用，可以用配置文件加载
 	xxlJobConfig := executor.XxlJobConfig{
+		Env:              "dev",
 		AdminAddress:     "http://127.0.0.1:8080/xxl-job-admin",
 		AccessToken:      "",
 		Appname:          "go-xxl-executor-sample",
 		Address:          "",
 		Ip:               "",
 		Port:             9998,
-		LogPath:          "/Users/peng/StudioProjects/go/go-xxl-executor/log",
+		LogPath:          "/Users/shen/Me/Study/Operation/Go/go-xxl-executor/log",
 		LogRetentionDays: 7,
 		HttpTimeout:      5,
 	}
 	// 注册JobHandler
 	_ = handler.AddJobHandler("test", &app.TestJobHandler{})
 	xxlExecutor := executor.NewXxlJobExecutor(xxlJobConfig)
-	xxlExecutor.Start()                    // 启动执行器服务
+	xxlExecutor.Start() // 启动执行器服务
 }

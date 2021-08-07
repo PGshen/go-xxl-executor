@@ -5,12 +5,15 @@ import (
 	"github.com/PGshen/go-xxl-executor/common"
 	"github.com/PGshen/go-xxl-executor/goroutine"
 	"github.com/PGshen/go-xxl-executor/server"
+	"os"
+	"os/signal"
 	"strconv"
 	"strings"
-	"sync"
+	"syscall"
 )
 
 type XxlJobExecutor struct {
+	env              string
 	adminAddress     string
 	accessToken      string
 	appname          string
@@ -32,6 +35,7 @@ func NewXxlJobExecutor(conf XxlJobConfig) XxlJobExecutor {
 	logPath := conf.LogPath
 	logRetentionDays := conf.LogRetentionDays
 	httpTime := conf.HttpTimeout
+	env := conf.Env
 	// 如果address没填写则自动获取本机IP
 	if strings.TrimSpace(address) == "" {
 		if strings.TrimSpace(ip) == "" {
@@ -40,6 +44,7 @@ func NewXxlJobExecutor(conf XxlJobConfig) XxlJobExecutor {
 		ipPort := ip + ":" + strconv.Itoa(port)
 		address = strings.ReplaceAll("http://ip:port", "ip:port", ipPort)
 	}
+	common.InitLogger(logPath, env)	// 提前初始化Logger
 	return XxlJobExecutor{
 		adminAddress:     adminAddress,
 		accessToken:      accessToken,
@@ -57,17 +62,16 @@ func NewXxlJobExecutor(conf XxlJobConfig) XxlJobExecutor {
 func (executor XxlJobExecutor) Start() {
 	defer executor.Destroy()
 	common.Log.Info("executor start...")
-	common.InitLogger(executor.logPath)
 	biz.InitAdminBizClient(executor.adminAddress, executor.accessToken, executor.httpTimeout)
 	biz.InitExecutorBiz(executor.logPath)
-	var wg sync.WaitGroup
-	wg.Add(1)                                                               // todo 待完善终止机制
 	go server.StartServer(executor.ip, executor.port)                       // 启动http服务
 	go goroutine.StartRegistry(executor.appname, executor.address)          // 注册协程
 	go goroutine.StartWorker()                                              // 单独一个线程轮询
 	go goroutine.StartCallback()                                            // 回调协程
 	go goroutine.StartCleanLog(executor.logPath, executor.logRetentionDays) // 日志定期清理
-	wg.Wait()
+	quit := make(chan os.Signal)
+	signal.Notify(quit, syscall.SIGKILL, syscall.SIGQUIT, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
 }
 
 // Destroy 销毁

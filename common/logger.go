@@ -11,22 +11,24 @@ import (
 var Log *log.Logger
 var logPath string
 
-func InitLogger(path string) {
+func InitLogger(path string, env string) {
 	logPath = path
-}
+	executorLogPath := "./executorlog"
+	//os.RemoveAll(executorLogPath)
+	_ = os.Mkdir(executorLogPath, 0777)
 
-func init() {
-	path := "./executorlog"
-	os.RemoveAll(path)
+	var h log.Handler
+	var err error
+	if strings.EqualFold(env, "dev") {
+		// 开发环境日志输出到控制台
+		h, err = log.NewStreamHandler(os.Stdout)
+	} else {
+		fileName := executorLogPath + "/executor.log"
+		h, err = log.NewTimeRotatingFileHandler(fileName, log.WhenDay, 1)
+	}
 
-	os.Mkdir(path, 0777)
-
-	//fileName := path + "/executor.log"
-	//h, err := log.NewTimeRotatingFileHandler(fileName, log.WhenMinute, 1)
-
-	h, err := log.NewStreamHandler(os.Stdout)
 	if err != nil {
-		panic(err)
+		panic(err.Error())
 	}
 	Log = log.NewDefault(h)
 }
@@ -45,7 +47,7 @@ func GetXxlLogger(logId int64) *log.Logger {
 	fileName := curLogPath + "/" + strconv.FormatInt(logId, 10) + ".log"
 	h, err := log.NewRotatingFileHandler(fileName, 20971520, 2)
 	if err != nil {
-		panic(err)
+		panic(err.Error())
 	}
 	logger := log.NewDefault(h)
 	//logger.SetLevel(log.LevelTrace)

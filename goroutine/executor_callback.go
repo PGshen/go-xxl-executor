@@ -9,6 +9,7 @@ import (
 
 // StartCallback 启动回调
 func StartCallback() {
+	common.Log.Info("start callback...")
 	for {
 		if params, ok := biz.PopExecutionRetFromQueue(); ok {
 			paramsStr, _ := json.Marshal(params)

@@ -9,6 +9,7 @@ import (
 )
 
 func StartCleanLog(logPath string, logRetentionDays int) {
+	common.Log.Info("start clean log...")
 	for {
 		if !strings.HasSuffix(logPath, "/") {
 			logPath += "/"

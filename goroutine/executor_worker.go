@@ -14,6 +14,7 @@ import (
 )
 
 func StartWorker() {
+	common.Log.Info("start worker...")
 	// 轮询DispatchReqQueue
 	for {
 		for {
@@ -38,6 +39,12 @@ func StartWorker() {
 
 // 一个协程跑一个jobId对应的任务
 func doTask(jobId int, taskQueue *biz.TaskQueue) {
+	defer func() {
+		// 防止抛出panic后直接退出了worker协程
+		if err := recover();err != nil{
+			log.Fatalf("panic: v%",err)
+		}
+	}()
 	defer func() { taskQueue.Running = false }()
 	// 串行，暂未实现阻塞处理策略
 	for {

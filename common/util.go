@@ -33,7 +33,6 @@ func GetInternalIp() string {
 func IsDirExists(fileAddr string)bool{
 	s,err:=os.Stat(fileAddr)
 	if err!=nil{
-		Log.Info(err)
 		return false
 	}
 	return s.IsDir()
