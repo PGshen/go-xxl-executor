@@ -93,7 +93,7 @@ xxlExecutor.Start() // 启动执行器服务
 2. executor_worker通过轮询从调度请求队列获取任务，启动新的协程，找到相应的JobHandler后开始执行任务逻辑，执行完成后将执行结果放入队列
 3. executor_callback通过轮询从执行结果队列获取结果，然后调用调度中心的接口通知任务的执行结果
 
-![avatar](./doc/go-xxl-executor.jpg)
+![go-xxl-executor](https://github.com/PGshen/go-xxl-executor/blob/master/doc/go-xxl-executor.jpg)
 
 > 上面是主要流程，手工kill或者超时也会导致任务终止
 
