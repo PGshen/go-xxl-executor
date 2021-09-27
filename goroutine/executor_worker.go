@@ -84,9 +84,9 @@ func trigger(task model.TriggerParam) error {
 	var runningCtx = &biz.RunningContext{Ctx: ctx, Cancel: cancel}
 	biz.AddRunningToList(jobId, runningCtx)
 	go func() {
-		ret, err := execTask(logger, cancel, task)
+		ret, err := execTask(logger, task)
 		if err != nil {
-			common.Log.Info(err)
+			common.Log.Error(err)
 		}
 		// 正常执行完成吗
 		if biz.RemoveLogIdFromSet(task.LogId) {
@@ -103,6 +103,7 @@ func trigger(task model.TriggerParam) error {
 			common.Log.Info("Task[" + strconv.FormatInt(task.LogId,10) + "] has been terminated due to timeout or killed")
 			logger.Warn("Task[" + strconv.FormatInt(task.LogId,10) + "] has been terminated due to timeout or killed")
 		}
+		cancel()	// 任务完成
 	}()
 	// 这里会阻塞等待，直到ctx.Done()
 	common.Log.Info("000999")
@@ -144,7 +145,7 @@ func trigger(task model.TriggerParam) error {
 }
 
 // 跑任务
-func execTask(logger *log.Logger, cancel context.CancelFunc, triggerParam model.TriggerParam) (biz.ReturnT, error) {
+func execTask(logger *log.Logger, triggerParam model.TriggerParam) (biz.ReturnT, error) {
 	// 找到相应的JobHandler
 	executorHandler := triggerParam.ExecutorHandler
 	jobHandler := handler.GetJobHandler(executorHandler)
@@ -163,7 +164,6 @@ func execTask(logger *log.Logger, cancel context.CancelFunc, triggerParam model.
 	jobHandler.Init()
 	ret := jobHandler.Execute(param)
 	jobHandler.Destroy()
-	cancel()	// 任务完成
 	return ret, nil
 }
 
